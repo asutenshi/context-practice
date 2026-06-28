@@ -67,6 +67,10 @@ evidence-locker/
   * `type: infrastructure` — Docker, uv, настройки окружения.
 * **Status (Статус):**
   * `status: todo`, `status: in-progress`, `status: in-review`, `status: done`.
+* **Priority (Приоритет):**
+  * `priority: high` — высокий приоритет (критично для MVP).
+  * `priority: medium` — средний приоритет.
+  * `priority: low` — низкий приоритет (можно отложить).
 
 ## 5. Issues относительно Технического Задания
 

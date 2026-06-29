@@ -11,31 +11,116 @@
 
 ## 2. Схема Базы Данных (Спроектирована Тимлидом)
 
+*Примечание по архитектуре xAPI:* xAPI — это очень гибкий формат, который имеет всего несколько обязательных полей. Поэтому мы достаем в колонки таблицы только 5 гарантированных (обязательных) полей для обеспечения поиска, а вся остальная гибкая информация ложится в `raw_data` в виде JSON.
+
 В базе требуются минимум 2 основные таблицы:
 
 **Таблица `evidence_records`** (Основное хранилище)
-- `id` (UUID, Primary Key)
-- `actor_id` (String) — кто совершил действие (парсится из `actor` xAPI)
-- `source_system` (String) — откуда пришло
-- `source_type` (String) — тип артефакта (парсится из `object.definition.type` xAPI)
-- `evidence_link` (String) — URL на артефакт (парсится из `object.id` xAPI)
-- `context` (String) — название проекта/репозитория (парсится из `context` xAPI)
+- `id` (UUID, Primary Key) — идентификатор самого Statement
+- `actor_id` (String) — нормализованный идентификатор пользователя
+- `verb_id` (String) — URI глагола
+- `object_id` (String) — URI объекта
 - `timestamp` (DateTime) — время события. Берется из xAPI `timestamp`.
+- `raw_data` (JSON/JSONB) — вся остальная информация из xAPI (включая context, source, definition и т.д.)
 - `review_status` (String/Enum) — `draft` | `pending` | `reviewed` | `rejected`
 - `reviewed_by` (String) — id преподавателя. *На время MVP, пока нет системы выдачи персональных токенов, бэкенд будет всегда записывать сюда `0` при успешном approve.*
-- `created_at` (DateTime) — когда запись попала в базу
+- `stored` (DateTime) — когда запись попала в базу (замена `created_at`)
 
 **Таблица `evidence_competencies`** (Связь Many-to-Many или One-to-Many)
 - `id` (UUID, PK)
 - `evidence_id` (UUID, Foreign Key)
 - `competency_id` (String) — внешний ID компетенции
 - `proposed_by` (String) — *Поле нужно для аналитики. Компетенция может быть предложена автоматически ботом-сборщиком ("collector"), либо добавлена вручную преподавателем при ревью ("teacher").*
+- `status` (Enum) — статус связи: `pending`, `approved`, `rejected`, `unlinked`.
+- `reviewed_by` (String) — ID проверяющего, который подтвердил/отклонил связь.
+- `created_at` (DateTime) — время создания связи.
+- `updated_at` (DateTime) — время последнего обновления статуса.
 
 ---
 
-## 3. Распределение задач (на 4 дня)
+## 3. Формат xAPI Statement
 
-### 3.1. Тимлид (Архитектура, Среда и Демонстрация)
+В архитектуре системы используется стандарт xAPI для фиксации событий. Стандарт требует наличия всего нескольких обязательных полей:
+1. `id` (UUID) — уникальный идентификатор самого утверждения (Statement).
+2. `actor` (Object) — кто совершил действие. Само поле `actor` **обязательно**, но внутри оно может содержать разные идентификаторы в зависимости от источника (`account`, `mbox`, `mbox_sha1sum`, `openid` и т.д.). Разработчикам необходимо реализовать логику нормализации, чтобы извлекать из этого гибкого объекта единую строку `actor_id` для записи в базу данных.
+3. `verb` (Object) — какое действие совершено. Обязательно содержит `id` (URI глагола).
+4. `object` (Object) — над чем совершено действие. Обязательно содержит `id` (URI объекта).
+5. `timestamp` (Timestamp) — время совершения события (формально опционально в стандарте, но обязательно для нашей бизнес-логики и гарантии порядка событий).
+
+Остальные поля (такие как `context`, `result`, `authority`, расширения в `definition`) являются опциональными и позволяют передавать любую гибкую структуру данных.
+
+### Базовый пример (Минимально необходимый xAPI Statement)
+
+Только обязательные поля, которые мы парсим и сохраняем в типизированные колонки БД (`id`, `actor_id`, `verb_id`, `object_id`, `timestamp`). 
+*(Примечание: в данном примере идентификатор передан через объект `account`, из которого бэкенд должен будет извлечь, например, `student_1` как `actor_id`)*:
+
+```json
+{
+  "id": "12345678-1234-5678-1234-567812345678",
+  "actor": {
+    "account": {
+      "name": "student_1",
+      "homePage": "http://example.com"
+    }
+  },
+  "verb": {
+    "id": "http://adlnet.gov/expapi/verbs/completed",
+    "display": { "en-US": "completed" }
+  },
+  "object": {
+    "id": "http://github.com/my-org/my-repo/commit/abc1234"
+  },
+  "timestamp": "2026-06-26T12:00:00Z"
+}
+```
+
+### Расширенный пример (с дополнительными данными)
+
+Пример с использованием опциональных полей (например, `context` и `result`), которые будут целиком сохранены в колонку `raw_data` в формате JSON:
+
+```json
+{
+  "id": "87654321-4321-8765-4321-876543210987",
+  "actor": {
+    "mbox": "mailto:student@example.com",
+    "name": "Иван Иванов"
+  },
+  "verb": {
+    "id": "http://adlnet.gov/expapi/verbs/scored"
+  },
+  "object": {
+    "id": "http://example.com/tests/math-101",
+    "definition": {
+      "type": "http://adlnet.gov/expapi/activities/assessment",
+      "name": { "ru-RU": "Тест по математике" }
+    }
+  },
+  "result": {
+    "score": {
+      "raw": 85,
+      "min": 0,
+      "max": 100
+    },
+    "success": true
+  },
+  "context": {
+    "registration": "ec531277-b57b-4c15-8d91-d2f4ca5b5256",
+    "contextActivities": {
+      "parent": [
+        { "id": "http://example.com/courses/math" }
+      ]
+    }
+  },
+  "timestamp": "2026-06-27T14:30:00Z"
+}
+```
+В данном случае в отдельные колонки БД попадут только 5 извлеченных параметров. Блоки `result`, `context` и расширенный `object.definition` останутся доступны в `raw_data`.
+
+---
+
+## 4. Распределение задач (на 4 дня)
+
+### 4.1. Тимлид (Архитектура, Среда и Демонстрация)
 Отвечает за инфраструктуру и концептуальное проектирование. Код ядра не пишет.
 
 **Задачи:**
@@ -44,7 +129,7 @@
 3. Создать `.env.example` и заложить туда 3 токена (`TEACHER_TOKEN`, `COLLECTOR_TOKEN`, `STUDENT_TOKEN`).
 4. **Написание Демо-Сборщика (Client):** Скрипт `scripts/demo_git_collector.py`, который локально читает историю Git и шлет строгие xAPI POST-запросы в API для защиты проекта.
 
-### 3.2. Разработчик 1 (Data Ingestion & Auth)
+### 4.2. Разработчик 1 (Data Ingestion & Auth)
 Отвечает за то, чтобы данные корректно входили в систему, а также за защиту эндпоинтов.
 
 **Задачи:**
@@ -52,17 +137,16 @@
 2. **Реализовать функцию проверки API-токена** (Dependency Injection для FastAPI) для ограничения доступа.
 3. **`POST /api/v1/evidences`**
    - *Input:* JSON со **строгим соблюдением стандарта xAPI Statement**. 
-     Пример ожидаемой структуры:
-     `{"actor": {"account": {"name": "student_1"}}, "verb": {"id": "http://adlnet.gov/expapi/verbs/completed"}, "object": {"id": "http://github.com/.../commit/...", "definition": {"type": "commit"}}, "context": {...}, "timestamp": "2026-06-26T12:00:00Z"}`
-   - *Логика:* Строгая валидация Pydantic-модели `xAPI Statement`. Парсинг вложенных полей в плоскую структуру таблицы `evidence_records`. Создание записи со статусом `pending`.
+     Пример ожидаемой структуры можно найти в разделе 3.
+   - *Логика:* Строгая валидация Pydantic-модели `xAPI Statement`. Извлечение базовых полей (`id`, `verb_id`, `object_id`, `timestamp`) и **нормализация гибкого объекта `actor` в единую строку `actor_id`** для сохранения в колонки таблицы `evidence_records`. Весь остальной Statement сохраняется в поле `raw_data`. Создание записи со статусом `pending`.
    - *Output:* HTTP 201 Created. Логирование события `evidence.created`.
 
-### 3.3. Разработчик 2 (Business Workflow, Search & Relations)
+### 4.3. Разработчик 2 (Business Workflow, Search & Relations)
 Отвечает за выдачу данных, изменение статусов и связи.
 
 **Задачи:**
 1. **`GET /api/v1/evidences`** (Поиск и Фильтрация)
-   - *Input:* Query-параметры: `?actor_id=...` (по учащемуся), `?competency_id=...` (по компетенции), `?context=...` (по проекту), `?review_status=...` (по статусу).
+   - *Input:* Query-параметры: `?actor_id=...` (по учащемуся), `?verb_id=...` (по глаголу), `?object_id=...` (по объекту), `?competency_id=...` (по компетенции), `?review_status=...` (по статусу).
    - *Логика:* Динамическое построение SQL-запроса.
    - *Output:* Список карточек подтверждений.
 2. **`PATCH /api/v1/evidences/{id}/review`** (Смена статуса)
@@ -76,7 +160,7 @@
 
 ---
 
-## 4. Механизм логирования событий (Event Emission)
+## 5. Механизм логирования событий (Event Emission)
 
 Куда попадают события `evidence.created`, `evidence.reviewed` и другие, которые требует спецификация?
 
@@ -88,7 +172,7 @@
 
 ---
 
-## 5. Verification Plan (Критерии успеха для MVP)
+## 6. Verification Plan (Критерии успеха для MVP)
 
 Для проверки готовности системы будет проведен следующий сценарий:
 1. Запуск `docker-compose up`. Поднятие API. База SQLite создастся автоматически как файл.

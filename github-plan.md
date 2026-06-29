@@ -87,7 +87,7 @@ evidence-locker/
 **Разработчик 1 (Backend Ingestion & Auth):**
 * **Issue 7:** Написать SQLAlchemy модели (`evidence_records`, `evidence_competencies`).
 * **Issue 8:** Реализовать Dependency Injection для валидации API-токенов.
-* **Issue 9:** Написать Pydantic модели для строгой валидации xAPI Statement.
+* **Issue 9:** Написать Pydantic модели для строгой валидации xAPI Statement с учетом профиля Evidence Locker (извлечение `source_system`, `source_type`).
 * **Issue 10:** Реализовать эндпоинт `POST /api/v1/evidences` в `api/v1/ingestion.py`.
   * *Подзадача:* Добавить логирование события `evidence.created` в `stdout` (JSON-строка).
 

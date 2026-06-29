@@ -51,23 +51,30 @@ graph TD
 ```mermaid
 erDiagram
     evidence_records {
-        UUID id PK
-        String actor_id "Кто совершил действие"
-        String source_system "Откуда пришло"
-        String source_type "Тип артефакта"
-        String evidence_link "URL на артефакт"
-        String context "Название проекта/репозитория"
-        DateTime timestamp "Время события (xAPI)"
-        String review_status "draft | pending | reviewed | rejected"
-        String reviewed_by "ID преподавателя (0 в MVP)"
-        DateTime created_at "Когда запись попала в базу"
+        UUID id PK "Идентификатор Statement"
+        String actor_id "Идентификатор пользователя"
+        String verb_id "URI глагола"
+        String object_id "URI объекта"
+        DateTime timestamp "Время события"
+        String source_system "Название внешней системы"
+        String source_type "Тип источника"
+        String context_id "Идентификатор проекта или курса"
+        Text note "Пояснение"
+        JSON raw_data "xAPI Statement"
+        Enum review_status "draft | pending | reviewed | rejected"
+        String reviewed_by "ID проверяющего"
+        DateTime stored "Время записи в базу"
     }
 
     evidence_competencies {
-        UUID id PK
-        UUID evidence_id FK
+        UUID id PK "Уникальный идентификатор связи"
+        UUID evidence_id FK "Ссылка на evidence_records"
         String competency_id "Внешний ID компетенции"
-        String proposed_by "teacher или collector"
+        String proposed_by "Кем предложена"
+        Enum status "pending | approved | rejected | unlinked"
+        String reviewed_by "Кто подтвердил/отклонил"
+        DateTime created_at "Время создания"
+        DateTime updated_at "Время изменения"
     }
 
     evidence_records ||--o{ evidence_competencies : "имеет компетенции"

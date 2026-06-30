@@ -81,19 +81,20 @@ evidence-locker/
 * **Issue 2:** Создать `Dockerfile` и `docker-compose.yml`.
 * **Issue 3:** Настроить `.env.example` с токенами `TEACHER_TOKEN`, `COLLECTOR_TOKEN`, `STUDENT_TOKEN`.
 * **Issue 4:** Описать структуру таблиц БД в issue/документации.
-* **Issue 5:** Написать демо-сборщик `scripts/demo_git_collector.py`.
+* **Issue 5:** Написать демо-сборщик `scripts/demo_git_collector.py` (предназначен для финальной демонстрации, а не локальной разработки).
 * **Issue 6:** Подготовить паспорт модуля (файл-заглушку `паспорт_модуля.md`).
 
 **Разработчик 1 (Backend Ingestion & Auth):**
 * **Issue 7:** Написать SQLAlchemy модели (`evidence_records`, `evidence_competencies`).
 * **Issue 8:** Реализовать Dependency Injection для валидации API-токенов.
 * **Issue 9:** Написать Pydantic модели для строгой валидации xAPI Statement с учетом профиля Evidence Locker (извлечение `source_system`, `source_type`).
-* **Issue 10:** Реализовать эндпоинт `POST /api/v1/evidences` в `api/v1/ingestion.py`.
+* **Issue 10:** Создать скрипт-сидер `scripts/seed.py` для генерации тестовых данных.
+* **Issue 11:** Реализовать эндпоинт `POST /api/v1/evidences` в `api/v1/ingestion.py`.
   * *Подзадача:* Добавить логирование события `evidence.created` в `stdout` (JSON-строка).
 
 **Разработчик 2 (Backend Workflow, Search & Relations):**
-* **Issue 11:** Реализовать эндпоинт `GET /api/v1/evidences` с фильтрацией (динамический SQL) в `api/v1/workflow.py`.
-* **Issue 12:** Реализовать эндпоинт `PATCH /api/v1/evidences/{id}/review` и логику смены статуса.
+* **Issue 12:** Реализовать эндпоинт `GET /api/v1/evidences` с фильтрацией (динамический SQL) в `api/v1/workflow.py`. *(Блокер: ожидание `scripts/seed.py` от Разработчика 1).*
+* **Issue 13:** Реализовать эндпоинт `PATCH /api/v1/evidences/{id}/review` и логику смены статуса. *(Блокер: ожидание `scripts/seed.py` от Разработчика 1).*
   * *Подзадача:* Добавить логирование события `evidence.reviewed` (или `evidence.rejected`) в `stdout` (JSON-строка).
-* **Issue 13:** Реализовать эндпоинт `POST /api/v1/evidences/{id}/competencies` для связи с компетенциями.
+* **Issue 14:** Реализовать эндпоинт `POST /api/v1/evidences/{id}/competencies` для связи с компетенциями.
   * *Подзадача:* Добавить логирование события `evidence.linked` в `stdout` (JSON-строка).

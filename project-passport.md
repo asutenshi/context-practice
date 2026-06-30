@@ -43,9 +43,9 @@
 - Сложная система прав (в `.env` будут прописаны 3 токена, у каждого из которых свои ограниченные права).
 
 ### 6. Входные данные
-- **xAPI Statement:** JSON-объект строгой структуры: `Кто (Actor) -> Что сделал (Verb) -> С чем (Object) -> В каком контексте (Context)`.
-- **Query-параметры поиска:** Фильтры по `actor_id`, `competency_id`, `context`, `review_status`.
-- **Команды от преподавателя:** Смена статуса (approved/rejected), ID привязываемой компетенции.
+- **xAPI Statement:** JSON-объект строгой структуры: `Кто (actor_id) -> Что сделал (verb_id) -> С чем (object_id) -> В каком контексте (context_id)`. Дополнительно извлекаются `timestamp`, `source_system`, `source_type`, `note`, а весь оригинальный payload сохраняется в `raw_data`.
+- **Query-параметры поиска:** Фильтры по `actor_id`, `competency_id`, `context_id`, `review_status`.
+- **Команды от преподавателя:** Смена статуса подтверждения (`draft`, `pending`, `reviewed`, `rejected`), управление статусом связи компетенции (`pending`, `approved`, `rejected`, `unlinked`) и ID привязываемой компетенции.
 - **Токены доступа:** Передаются в заголовках для авторизации операций.
 
 ### 7. Выходные данные и артефакты
@@ -214,23 +214,30 @@ graph TD
 ```mermaid
 erDiagram
     evidence_records {
-        UUID id PK
-        String actor_id "Кто совершил действие"
-        String source_system "Откуда пришло"
-        String source_type "Тип артефакта"
-        String evidence_link "URL на артефакт"
-        String context "Название проекта/репозитория"
-        DateTime timestamp "Время события (xAPI)"
-        String review_status "draft | pending | reviewed | rejected"
-        String reviewed_by "ID преподавателя (0 в MVP)"
-        DateTime created_at "Когда запись попала в базу"
+        UUID id PK "Идентификатор Statement"
+        String actor_id "Идентификатор пользователя"
+        String verb_id "URI глагола"
+        String object_id "URI объекта"
+        DateTime timestamp "Время события"
+        String source_system "Название внешней системы"
+        String source_type "Тип источника"
+        String context_id "Идентификатор проекта или курса"
+        Text note "Пояснение"
+        JSON raw_data "xAPI Statement"
+        Enum review_status "draft | pending | reviewed | rejected"
+        String reviewed_by "ID проверяющего"
+        DateTime stored "Время записи в базу"
     }
 
     evidence_competencies {
-        UUID id PK
-        UUID evidence_id FK
+        UUID id PK "Уникальный идентификатор связи"
+        UUID evidence_id FK "Ссылка на evidence_records"
         String competency_id "Внешний ID компетенции"
-        String proposed_by "teacher или collector"
+        String proposed_by "Кем предложена"
+        Enum status "pending | approved | rejected | unlinked"
+        String reviewed_by "Кто подтвердил/отклонил"
+        DateTime created_at "Время создания"
+        DateTime updated_at "Время изменения"
     }
 
     evidence_records ||--o{ evidence_competencies : "имеет компетенции"

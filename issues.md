@@ -120,6 +120,35 @@
 ```
 ````
 
+### Issue 10: Отсутствует строгая валидация обязательных расширений xAPI
+````markdown
+```markdown
+## Описание
+В файле `app/schemas/evidence.py` при извлечении бизнес-полей из `context.extensions` используются значения по умолчанию (например, `extensions.get("source_system", "unknown_system")`). Согласно Issue 6, коллекторы обязаны передавать `source_system` и `source_type`. Это означает, что если этих полей нет, должна срабатывать ошибка валидации (422 Unprocessable Entity), а не подставляться дефолтное значение.
+
+## Задачи
+- [ ] Изменить логику в `extract_business_fields` в `app/schemas/evidence.py`.
+- [ ] Если `source_system` или `source_type` отсутствуют в расширениях, выбрасывать `ValueError`, чтобы Pydantic возвращал ошибку 422.
+
+**Labels:** `role: backend-ingestion`, `type: bug`, `status: todo`, `priority: medium`
+```
+````
+
+### Issue 11: Покрытие тестами (Backend Ingestion & Auth)
+````markdown
+```markdown
+## Описание
+Проект требует минимального покрытия тестами, чтобы убедиться в корректности сбора данных и авторизации. На данный момент тесты полностью отсутствуют.
+
+## Задачи
+- [ ] Написать тесты для проверки Pydantic моделей (валидный/невалидный xAPI Statement).
+- [ ] Написать API-тесты (используя `TestClient` из `fastapi.testclient`) для эндпоинта `POST /api/v1/evidences`.
+- [ ] Написать тесты для проверки зависимостей авторизации (`verify_collector_token` и `verify_teacher_token`).
+
+**Labels:** `role: backend-ingestion`, `type: feature`, `status: todo`, `priority: medium`
+```
+````
+
 ## Разработчик 2 (Backend Workflow, Search & Relations)
 
 ### Issue 4: Эндпоинт GET /api/v1/evidences с фильтрацией
@@ -193,5 +222,73 @@
 - В `stdout` выводится лог `evidence.linked`.
 
 **Labels:** `role: backend-workflow`, `type: feature`, `status: todo`
+```
+````
+
+### Issue 9: Отсутствует авторизация в эндпоинтах GET /evidences и PATCH /review
+````markdown
+```markdown
+## Описание
+Часть критически важных эндпоинтов в файле `app/api/v1/workflow.py` не защищена токенами.
+- `GET /api/v1/evidences` (получение списка свидетельств) доступен без токена, хотя по паспорту проекта запрос должен выполняться с `TEACHER_TOKEN` (или другими токенами в зависимости от роли).
+- `PATCH /api/v1/evidences/{evidence_id}/review` (изменение статуса) не защищен, любой пользователь может изменить статус ревью. Согласно заданию, он должен быть защищен `verify_teacher_token`.
+
+## Задачи
+- [ ] Добавить зависимость для проверки прав (например, `Depends(verify_teacher_token)`) в параметры эндпоинта `get_evidences`.
+- [ ] Добавить `Depends(verify_teacher_token)` в параметры эндпоинта `review_evidence`.
+
+**Labels:** `role: backend-workflow`, `type: feature`, `status: todo`, `priority: high`
+```
+````
+
+### Issue 12: Покрытие тестами (Backend Workflow)
+````markdown
+```markdown
+## Описание
+Необходимо обеспечить минимальное тестовое покрытие для бизнес-логики (ревью и поиск), чтобы гарантировать, что фильтрация и изменение статусов работают корректно.
+
+## Задачи
+- [ ] Написать API-тесты (с использованием `TestClient`) для эндпоинта `GET /api/v1/evidences`, проверив базовую фильтрацию.
+- [ ] Написать API-тесты для эндпоинта `PATCH /api/v1/evidences/{evidence_id}/review`, убедившись, что статус меняется только при правильном токене.
+- [ ] Написать тесты для эндпоинта `POST /api/v1/evidences/{evidence_id}/competencies` (привязка компетенций с ролями Teacher и Collector).
+
+**Labels:** `role: backend-workflow`, `type: feature`, `status: todo`, `priority: medium`
+```
+````
+
+## Тимлид (Инфраструктура и Демонстрация)
+
+### Issue 13: Пустой скрипт demo_git_collector.py
+````markdown
+```markdown
+## Описание
+Файл `scripts/demo_git_collector.py` создан, но внутри него нет кода. Этот скрипт необходим для полевых испытаний (отправка валидного POST-запроса с xAPI Statement в систему).
+
+## Задачи
+- [ ] Написать скрипт `scripts/demo_git_collector.py`.
+- [ ] Скрипт должен формировать валидный JSON (xAPI Statement с расширениями `source_system` и `source_type`).
+- [ ] Скрипт должен читать `COLLECTOR_TOKEN` из переменных окружения и делать POST-запрос на `/api/v1/evidences`.
+
+**Labels:** `role: teamlead`, `type: feature`, `status: todo`, `priority: high`
+```
+````
+
+### Issue 14: Отсутствует Makefile
+````markdown
+```markdown
+## Описание
+В корне проекта отсутствует `Makefile`, который требуется по техническому заданию для стандартизации команд запуска и тестирования.
+
+## Задачи
+- [ ] Создать `Makefile` в корне проекта.
+- [ ] Добавить команды:
+  - `install`: `uv sync` (установка зависимостей из pyproject.toml и uv.lock)
+  - `test`: `uv run pytest`
+  - `run`: `uv run uvicorn app.main:app --reload --port 8000`
+  - `run-demo`: `uv run python scripts/demo_git_collector.py`
+  - `docker-build`: `docker-compose build`
+  - `docker-up`: `docker-compose up -d`
+
+**Labels:** `role: teamlead`, `type: infrastructure`, `status: todo`, `priority: high`
 ```
 ````
